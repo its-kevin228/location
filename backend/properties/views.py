@@ -1,4 +1,5 @@
 from rest_framework import viewsets
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 
 from .models import Category, Equipment, Property, PropertyPhoto, PropertyType, Sale
@@ -56,6 +57,18 @@ class PropertyPhotoViewSet(viewsets.ModelViewSet):
 		if user.role == 'owner':
 			return queryset.filter(property__owner=user)
 		return queryset.filter(property__leases__tenant__user=user).distinct()
+
+	def perform_create(self, serializer):
+		user = self.request.user
+		property_instance = serializer.validated_data.get('property')
+
+		if user.role == 'tenant':
+			raise PermissionDenied('Les locataires ne peuvent pas ajouter de photos.')
+
+		if user.role == 'owner' and property_instance.owner_id != user.id:
+			raise PermissionDenied('Vous ne pouvez ajouter des photos que sur vos propres biens.')
+
+		serializer.save()
 
 
 class SaleViewSet(viewsets.ModelViewSet):
