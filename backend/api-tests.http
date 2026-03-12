@@ -1,0 +1,176 @@
+@baseUrl = http://127.0.0.1:8000
+@runId = test001
+@ownerUsername = owner_{{runId}}
+@tenantUsername = tenant_{{runId}}
+@password = Pass12345!
+
+### 1) Register OWNER
+# @name registerOwner
+POST {{baseUrl}}/api/auth/register/
+Content-Type: application/json
+
+{
+  "username": "{{ownerUsername}}",
+  "email": "{{ownerUsername}}@example.com",
+  "first_name": "Owner",
+  "last_name": "Test",
+  "role": "owner",
+  "phone": "+22890000000",
+  "password": "{{password}}"
+}
+
+### 2) Login OWNER (save JWT)
+# @name ownerLogin
+POST {{baseUrl}}/api/auth/login/
+Content-Type: application/json
+
+{
+  "username": "{{ownerUsername}}",
+  "password": "{{password}}"
+}
+
+### 3) Me OWNER
+GET {{baseUrl}}/api/auth/me/
+Authorization: Bearer {{ownerLogin.response.body.$.access}}
+
+### 4) Owner should be forbidden on /api/users/ (expected 403)
+GET {{baseUrl}}/api/users/
+Authorization: Bearer {{ownerLogin.response.body.$.access}}
+
+### 5) Create Category
+# @name createCategory
+POST {{baseUrl}}/api/categories/
+Authorization: Bearer {{ownerLogin.response.body.$.access}}
+Content-Type: application/json
+
+{
+  "name": "Appartement {{runId}}",
+  "slug": "appartement-{{runId}}",
+  "icon": "building"
+}
+
+### 6) Create Property Type
+# @name createPropertyType
+POST {{baseUrl}}/api/property-types/
+Authorization: Bearer {{ownerLogin.response.body.$.access}}
+Content-Type: application/json
+
+{
+  "name": "Studio {{runId}}",
+  "category": {{createCategory.response.body.$.id}}
+}
+
+### 7) Create Equipment
+# @name createEquipment
+POST {{baseUrl}}/api/equipments/
+Authorization: Bearer {{ownerLogin.response.body.$.access}}
+Content-Type: application/json
+
+{
+  "name": "Clim {{runId}}"
+}
+
+### 8) Create Property
+# @name createProperty
+POST {{baseUrl}}/api/properties/
+Authorization: Bearer {{ownerLogin.response.body.$.access}}
+Content-Type: application/json
+
+{
+  "owner": {{registerOwner.response.body.$.id}},
+  "property_type": {{createPropertyType.response.body.$.id}},
+  "equipments": [{{createEquipment.response.body.$.id}}],
+  "title": "Villa API {{runId}}",
+  "description": "Test REST Client",
+  "address": "Lomé",
+  "city": "Lomé",
+  "surface": 120.5,
+  "rooms": 4,
+  "listing_type": "both",
+  "rent_price": 250000,
+  "charges": 15000,
+  "sale_price": 45000000,
+  "status": "available",
+  "is_active": true
+}
+
+### 9) Register TENANT user
+# @name registerTenantUser
+POST {{baseUrl}}/api/auth/register/
+Content-Type: application/json
+
+{
+  "username": "{{tenantUsername}}",
+  "email": "{{tenantUsername}}@example.com",
+  "first_name": "Tenant",
+  "last_name": "User",
+  "role": "tenant",
+  "phone": "+22891111111",
+  "password": "{{password}}"
+}
+
+### 10) Login TENANT (save JWT)
+# @name tenantLogin
+POST {{baseUrl}}/api/auth/login/
+Content-Type: application/json
+
+{
+  "username": "{{tenantUsername}}",
+  "password": "{{password}}"
+}
+
+### 11) Create Tenant profile (owner)
+# @name createTenantProfile
+POST {{baseUrl}}/api/tenants/
+Authorization: Bearer {{ownerLogin.response.body.$.access}}
+Content-Type: application/json
+
+{
+  "user": {{registerTenantUser.response.body.$.id}},
+  "first_name": "Tenant",
+  "last_name": "Profile",
+  "email": "{{tenantUsername}}@example.com",
+  "phone": "+22892222222",
+  "profession": "Dev"
+}
+
+### 12) Create Lease (owner)
+# @name createLease
+POST {{baseUrl}}/api/leases/
+Authorization: Bearer {{ownerLogin.response.body.$.access}}
+Content-Type: application/json
+
+{
+  "property": {{createProperty.response.body.$.id}},
+  "tenant": {{createTenantProfile.response.body.$.id}},
+  "start_date": "2026-03-01",
+  "end_date": "2027-03-01",
+  "rent_amount": 250000,
+  "charges": 15000,
+  "deposit_amount": 500000,
+  "annual_revision_rate": 3.5,
+  "status": "active"
+}
+
+### 13) Tenant reads own leases
+GET {{baseUrl}}/api/leases/
+Authorization: Bearer {{tenantLogin.response.body.$.access}}
+
+### 14) Create Payment (owner)
+# @name createPayment
+POST {{baseUrl}}/api/payments/
+Authorization: Bearer {{ownerLogin.response.body.$.access}}
+Content-Type: application/json
+
+{
+  "lease": {{createLease.response.body.$.id}},
+  "amount": 265000,
+  "due_date": "2026-03-05",
+  "status": "pending",
+  "method": "bank_transfer",
+  "reference": "PAY-{{runId}}"
+}
+
+### 15) Tenant reads own payments
+GET {{baseUrl}}/api/payments/
+Authorization: Bearer {{tenantLogin.response.body.$.access}}
